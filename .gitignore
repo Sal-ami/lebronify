@@ -1,0 +1,14 @@
+/target
+/reference
+/out
+/_*.ps1
+/_*.log
+/_*.err
+/apps/web/pkg
+/apps/web/dist
+*.wasm
+*.rlib
+*.pdb
+.DS_Store
+Thumbs.db
+*.code-workspace

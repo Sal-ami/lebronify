@@ -1,0 +1,23 @@
+[package]
+name = "lab-cli"
+description = "labronify from the command line: reduce a medium, solve, export, re-export."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+default-run = "labronify"
+
+# The crate is `lab-cli` but the binary users type should read as the product.
+[[bin]]
+name = "labronify"
+path = "src/main.rs"
+
+[dependencies]
+lab-core = { workspace = true }
+lab-media = { workspace = true }
+lab-export = { workspace = true }
+serde_json = { workspace = true }
+
+# No clap: the command surface is small enough that hand-rolled parsing keeps the
+# dependency tree honest and the binary tiny. `--help` is generated from the same
+# table the parser uses, so it cannot drift.

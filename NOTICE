@@ -1,0 +1,45 @@
+# NOTICE
+
+lebronify is MIT licensed. See `LICENSE`.
+
+## Derived from obamify
+
+The engine in this project is a derivative work of
+[obamify](https://github.com/Spu7Nix/obamify), MIT licensed,
+copyright (c) 2025 Spu7Nix. A copy of that license is kept at
+`crates/lab-core/assets/OBAMIFY-LICENSE-MIT.txt`.
+
+What is derived, specifically:
+
+| lebronify | obamify | what was taken |
+| --- | --- | --- |
+| `crates/lab-core/src/cost.rs` | `src/app/calculate/mod.rs` (`heuristic`) | the cost formula, verbatim |
+| `crates/lab-core/src/solvers.rs` | `src/app/calculate/mod.rs` (`process_genetic`), `src/app/calculate/drawing_process.rs` | solver structure, constants, stopping rule |
+| `crates/lab-core/src/solvers.rs` (`solve_optimal`) | `src/app/calculate/mod.rs` (`process_optimal`) | Kuhn-Munkres, inlined the same way and for the same reason (progress and cancellation) |
+| `crates/lab-core/src/settings.rs` | `src/app/calculate/util.rs` (`GenerationSettings`, `CropScale`), `src/app/gui.rs` | field semantics, defaults, slider ranges, the proximity calibration step |
+| `crates/lab-core/assets/lebron-target-256.png` | `src/app/calculate/target256.png` | the target image, renamed |
+| `crates/lab-core/assets/lebron-weights-256.png` | `src/app/calculate/weights256.png` | the importance mask, renamed |
+| `crates/lab-core/src/target.rs` | `src/app/calculate/util.rs` (`get_images`, `load_weights`) | crop-then-resize order and the red-channel weight read |
+
+The shaders and the fluid simulation in upstream obamify were read to fix the
+engine's numbers but no code from those files has been copied yet. When the GPU
+renderer and the simulation are ported they belong in this table too.
+
+## What is new
+
+Everything that makes this more than obamify is original to this project:
+
+* the [`Medium`](crates/lab-core/src/medium.rs) contract and the reducers in
+  `crates/lab-media`
+* the [`Assignment`](crates/lab-core/src/lib.rs) and `Artifact` types, including
+  validation and the on-disk format
+* the CLI, the renderers in `crates/lab-export`, and the before/after strip
+* the no-network guard in `xtask/src/guard.rs`
+* the media matrix and the generated documentation
+
+## Asset attribution
+
+LeBron James's likeness is used for the same reason obamify uses it: as the
+canonical joke target of the transformation. The target and mask images are
+inherited from upstream and are not covered by this project's license grant
+beyond what upstream's MIT license conveys.

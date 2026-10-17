@@ -1,0 +1,15 @@
+[package]
+name = "lab-web"
+description = "The engine as a wasm32 module: reduce, then solve with a per-generation trace."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# A cdylib is the whole module: the page loads these bytes and nothing else.
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lab-core = { workspace = true }
+lab-media = { workspace = true }

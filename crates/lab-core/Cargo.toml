@@ -1,0 +1,17 @@
+[package]
+name = "lab-core"
+description = "Medium-agnostic LeBronify engine: cell reduction, cost model, solvers, LeBron target."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# lab-core is deliberately dependency-light. It does no filesystem or network IO:
+# the LeBron target ships as bytes embedded in the binary, exactly like the
+# reference app does. `frand` is the same PRNG crate the reference solver uses,
+# so the genetic solver's swap sequence is reproducible and directly comparable.
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+image = { workspace = true }
+frand = "0.10"

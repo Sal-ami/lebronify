@@ -1,0 +1,18 @@
+[package]
+name = "lab-media"
+description = "Medium reducers: decode a medium into the engine's N x N RGB cell grid."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+lab-core = { workspace = true }
+image = { workspace = true }
+# JSON tables are read with the same parser lab-core already links, so the
+# table tier adds no new dependency tree.
+serde_json = { workspace = true }
+# Pure-Rust audio decoding. No C dependency and no network: it reads the bytes
+# it is handed. MPL-2.0, which is compatible with shipping this binary; see
+# NOTICE for the attribution line.
+symphonia = { workspace = true }

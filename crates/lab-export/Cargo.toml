@@ -1,0 +1,11 @@
+[package]
+name = "lab-export"
+description = "Render an assignment to pixels. Export formats are renderers of the assignment, never the source of truth."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+lab-core = { workspace = true }
+image = { workspace = true }

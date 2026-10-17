@@ -1,0 +1,7 @@
+# Channel and components only. Do NOT add `targets = [...]` here: pinning a
+# target makes cargo sync that component on every invocation, which turns a
+# routine `cargo test` into a network fetch. The wasm target is added explicitly
+# (`rustup target add wasm32-unknown-unknown`) and only the wasm crate needs it.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

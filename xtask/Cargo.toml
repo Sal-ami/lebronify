@@ -1,0 +1,14 @@
+[package]
+name = "xtask"
+description = "Build tasks: the no-network guard and the media matrix."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+lab-core = { workspace = true }
+
+# xtask deliberately depends on nothing else: it must run before the workspace is
+# known to compile.

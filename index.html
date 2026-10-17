@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>lebronify</title>
+<style>
+  :root { --bg:#1e1e1e; --panel:#252525; --widget:#3a3a3a; --hover:#4a4a4a; --text:#dcdcdc;
+    --dim:#9a9a9a; --accent:#4a90d9; --stroke:#4d4d4d; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #stage { position: absolute; inset: 0; margin: auto; width: min(100vw, 100vh);
+    height: min(100vw, 100vh); image-rendering: pixelated; background: #000; touch-action: none; }
+  #v-out { position: absolute; inset: 0; margin: auto; width: min(100vw, 100vh);
+    height: min(100vw, 100vh); object-fit: contain; background: #000; z-index: 5; }
+  #v-out[hidden] { display: none; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; flex-wrap: wrap;
+    align-items: center; gap: 6px 10px; padding: 8px 10px; background: rgba(37,37,37,.94);
+    border-bottom: 1px solid var(--stroke); }
+  #bar .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  #bar .grp[hidden] { display: none; }
+  button, select, input[type=text] { font: inherit; color: var(--text); }
+  #bar button, #bar select, .win button, .win select, .win input[type=text] { padding: 6px 10px;
+    border: 1px solid var(--stroke); border-radius: 5px; background: var(--widget); cursor: pointer; }
+  button:hover, select:hover, .win input[type=text]:hover { background: var(--hover); }
+  button:active { transform: translateY(1px); }
+  button.mini { padding: 6px 8px; }
+  #bar label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  .sep { width: 1px; align-self: stretch; background: var(--stroke); margin: 0 2px; }
+  .lbl { opacity: .65; }
+  #warn { position: fixed; left: 0; right: 0; bottom: 8px; text-align: center; color: #ff9a9a;
+    z-index: 40; pointer-events: none; }
+  .win { position: fixed; z-index: 20; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(440px, 94vw); max-height: 92vh; overflow: auto; padding: 16px; background: var(--panel);
+    border: 1px solid var(--stroke); border-radius: 8px; box-shadow: 0 16px 48px rgba(0,0,0,.55); }
+  .win.bottom { top: auto; bottom: 16px; transform: translateX(-50%); }
+  .win[hidden] { display: none; }
+  .win h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+  .win .line { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .win .line > label { opacity: .8; }
+  .win input[type=text] { flex: 1; min-width: 0; }
+  hr { border: 0; border-top: 1px solid var(--stroke); margin: 12px 0; }
+  .crops { display: flex; align-items: flex-start; justify-content: center; gap: 10px; }
+  .crop { display: flex; flex-direction: column; gap: 6px; width: 140px; }
+  .crop .cap { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; opacity: .6; }
+  .crop canvas { width: 100%; height: 140px; background: #000; border: 1px solid var(--stroke);
+    border-radius: 6px; cursor: grab; touch-action: none; }
+  .crop canvas:active { cursor: grabbing; }
+  .crop input[type=range] { width: 100%; }
+  .arrow { align-self: center; opacity: .5; font-size: 20px; margin-top: 40px; }
+  details { border-top: 1px solid var(--stroke); padding-top: 10px; margin-top: 4px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+  .win .field { margin: 10px 0; }
+  .win .field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    opacity: .6; margin-bottom: 4px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row output { width: 2.6em; text-align: right; font-variant-numeric: tabular-nums; opacity: .75; }
+  input[type=range] { width: 100%; }
+  .actions { display: flex; gap: 10px; margin-top: 16px; }
+  .actions button { flex: 1; padding: 11px; font-weight: 600; }
+  .actions .ghost { font-weight: 400; background: transparent; }
+  .hint { font-size: 12px; opacity: .55; margin: 4px 0 0; }
+  progress { width: 100%; height: 12px; }
+  .glow { animation: glow 1.6s ease-in-out infinite; }
+  @keyframes glow { 0%,100% { box-shadow: 0 0 0 rgba(74,144,217,0); } 50% { box-shadow: 0 0 10px rgba(74,144,217,.9); } }
+  .pal { display: inline-flex; gap: 4px; }
+  .pal button { width: 22px; height: 22px; padding: 0; border-radius: 4px; border: 2px solid transparent; }
+  .pal button.on { border-color: #fff; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; opacity: .8; z-index: 30; background: var(--bg); }
+  #loading[hidden] { display: none; }
+</style>
+</head>
+<body>
+<canvas id="stage" width="512" height="512"></canvas>
+<img id="v-out" hidden alt="lebronified video">
+
+<div id="bar">
+  <button id="home" title="transform mode" hidden>transform</button>
+  <span id="t-ui" class="grp">
+    <button id="play">play transformation</button>
+    <label><input type="checkbox" id="reverse"> reverse</label>
+    <span class="sep"></span>
+    <button id="savegif">save gif</button>
+    <span class="sep"></span>
+    <span class="lbl">choose preset:</span>
+    <select id="presets"></select>
+    <button id="delpreset" class="mini" title="delete preset" hidden>x</button>
+    <button id="newimg" class="glow">lebronify new image</button>
+    <span class="sep"></span>
+    <button id="drawbtn" title="drawing mode">draw</button>
+    <button id="vidbtn" title="video mode">video</button>
+  </span>
+  <span id="d-ui" class="grp" hidden>
+    <span class="lbl">brush</span>
+    <input type="range" id="d-size" min="1" max="20" value="5" style="width:110px">
+    <span class="pal" id="d-pal"></span>
+    <span class="sep"></span>
+    <button id="d-clear">clear</button>
+    <button id="d-obamify">lebronify drawing</button>
+  </span>
+  <span id="v-ui" class="grp" hidden>
+    <input type="file" id="v-src" accept="video/*">
+    <button id="v-go">lebronify video</button>
+    <button id="v-save" hidden>save gif</button>
+  </span>
+</div>
+
+<div id="loading">Loading…</div>
+<div id="warn"></div>
+
+<div id="settings" class="win" hidden>
+  <h2>lebronification settings</h2>
+  <div class="line"><label for="s-name">name:</label><input type="text" id="s-name" value="image"></div>
+  <hr>
+  <div class="crops">
+    <div class="crop">
+      <span class="cap">source</span>
+      <canvas id="src-crop" width="200" height="200"></canvas>
+      <input type="range" id="s-cs" min="1" max="5" step="0.05" value="1" title="zoom">
+      <button id="s-src-btn">choose source</button>
+    </div>
+  </div>
+  <hr>
+  <details>
+    <summary>advanced settings</summary>
+    <div class="field">
+      <label for="s-res">resolution</label>
+      <div class="row"><input type="range" id="s-res" min="64" max="256" step="8" value="168"><output id="s-res-o">168</output></div>
+    </div>
+    <div class="field">
+      <label for="s-prox">proximity importance</label>
+      <div class="row"><input type="range" id="s-prox" min="0" max="50" step="1" value="6"><output id="s-prox-o">6</output></div>
+    </div>
+    <div class="field">
+      <label for="s-algo">algorithm</label>
+      <select id="s-algo">
+        <option value="fast" selected>fast algorithm</option>
+        <option value="optimal">optimal algorithm</option>
+      </select>
+    </div>
+  </details>
+  <hr>
+  <div class="actions">
+    <button id="s-start">start!</button>
+    <button id="s-cancel" class="ghost">cancel</button>
+  </div>
+  <input type="file" id="s-src" hidden>
+</div>
+
+<div id="progress" class="win bottom" hidden>
+  <div id="p-label">preparing...</div>
+  <progress id="p-bar" max="1" value="0"></progress>
+  <div class="actions"><button id="p-cancel" class="ghost">cancel</button></div>
+</div>
+
+<div id="gifwin" class="win" hidden>
+  <div id="g-label">recording gif...</div>
+  <div class="actions"><button id="g-cancel" class="ghost">cancel</button></div>
+</div>
+
+<div id="errorwin" class="win" hidden>
+  <div id="e-msg"></div>
+  <div class="actions"><button id="e-close" class="ghost">close</button></div>
+</div>
+
+<script src="labronify.wasm.js"></script>
+
+<script id="worker-src" type="text/plain">
+let ex = null;
+
+const imports = { env: { labronify_frame: function (gen, rp, rl, ap, an) {
+  const rgb = new Uint8Array(ex.memory.buffer, rp, rl).slice();
+  const assign = new Uint32Array(ex.memory.buffer, ap, an).slice();
+  self.postMessage({ t: "frame", gen: gen, rgb: rgb.buffer, assign: assign.buffer },
+    [rgb.buffer, assign.buffer]);
+} } };
+
+function put(a) {
+  const p = ex.labronify_alloc(a.length);
+  new Uint8Array(ex.memory.buffer, p, a.length).set(a);
+  return p;
+}
+
+function assignment(ptr, n) {
+  const a = new Uint32Array(ex.memory.buffer, ptr, n).slice();
+  ex.labronify_free(ptr, n * 4);
+  return a;
+}
+
+self.onmessage = function (e) {
+  const j = e.data;
+  try {
+    if (j.t === "init") {
+      const bin = atob(j.wasm);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      ex = new WebAssembly.Instance(new WebAssembly.Module(bytes), imports).exports;
+      self.postMessage({ t: "ready" });
+      return;
+    }
+
+    if (j.t === "reduce") {
+      const file = new Uint8Array(j.bytes);
+      const fp = put(file);
+      const ep = put(new TextEncoder().encode(j.ext));
+      const g = ex.labronify_reduce(fp, file.length, ep, j.ext.length, j.side,
+        j.crop.x, j.crop.y, j.crop.scale);
+      ex.labronify_free(fp, file.length);
+      ex.labronify_free(ep, j.ext.length);
+      if (!g) { self.postMessage({ t: "error", msg: "could not read that file as ." + j.ext }); return; }
+      const n = j.side * j.side;
+      const rgb = new Uint8Array(ex.memory.buffer, g, n * 3).slice();
+      ex.labronify_free(g, n * 3);
+      self.postMessage({ t: "grid", rgb: rgb.buffer }, [rgb.buffer]);
+      return;
+    }
+
+    if (j.t === "solve") {
+      const n = j.side * j.side;
+      const gp = put(new Uint8Array(j.grid));
+      const tp = j.target ? put(new Uint8Array(j.target)) : 0;
+      const a = ex.labronify_solve_on(gp, tp, j.side, j.prox, j.optimal ? 1 : 0);
+      ex.labronify_free(gp, n * 3);
+      if (tp) ex.labronify_free(tp, n * 3);
+      if (!a) { self.postMessage({ t: "error", msg: "solve failed" }); return; }
+      ex.labronify_free(a, n * 4);
+      self.postMessage({ t: "done" });
+      return;
+    }
+
+    if (j.t === "adapt") {
+      const n = j.side * j.side;
+      const gp = put(new Uint8Array(j.grid));
+      let pp = 0;
+      if (j.prev) { pp = ex.labronify_alloc(n * 4); new Uint8Array(ex.memory.buffer, pp, n * 4).set(new Uint8Array(j.prev)); }
+      const a = ex.labronify_solve_warm(gp, j.side, j.prox, pp, j.maxGens);
+      ex.labronify_free(gp, n * 3);
+      if (pp) ex.labronify_free(pp, n * 4);
+      if (!a) { self.postMessage({ t: "error", msg: "adapt failed" }); return; }
+      const out = new Uint32Array(ex.memory.buffer, a, n).slice();
+      ex.labronify_free(a, n * 4);
+      self.postMessage({ t: "assign", assign: out.buffer }, [out.buffer]);
+      return;
+    }
+  } catch (err) {
+    self.postMessage({ t: "error", msg: String((err && err.message) || err) });
+  }
+};
+</script>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+/* ---- bytes helpers ---------------------------------------------------- */
+function b64(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function unb64(str) {
+  const bin = atob(str);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function warn(msg) { $("warn").textContent = msg; if (msg) setTimeout(() => { if ($("warn").textContent === msg) $("warn").textContent = ""; }, 6000); }
+
+/* ---- morph simulation, ported from obamify's morph_sim.rs ------------ */
+const PERSONAL_SPACE = 0.95, MAX_VELOCITY = 6.0, ALIGNMENT = 0.8, DST_FORCE = 0.13;
+
+class Sim {
+  constructor() {
+    this.grid = 0; this.n = 0; this.name = "image";
+    this.pos = null; this.col = null;
+    this.srcx = this.srcy = this.dstx = this.dsty = null;
+    this.velx = this.vely = this.accx = this.accy = null;
+    this.dstforce = null; this.age = null;
+    this.head = null; this.next = null;
+    this.reversed = false;
+    this.assignment = null;
+  }
+
+  load(rgb, grid) {
+    const n = grid * grid;
+    this.grid = grid; this.n = n;
+    this.col = rgb.slice();
+    this.pos = new Float32Array(n * 2);
+    this.srcx = new Float32Array(n); this.srcy = new Float32Array(n);
+    this.dstx = new Float32Array(n); this.dsty = new Float32Array(n);
+    this.velx = new Float32Array(n); this.vely = new Float32Array(n);
+    this.accx = new Float32Array(n); this.accy = new Float32Array(n);
+    this.dstforce = new Float32Array(n).fill(DST_FORCE);
+    this.age = new Float32Array(n);
+    this.head = new Int32Array(n); this.next = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      this.pos[i * 2] = (i % grid) + 0.5;
+      this.pos[i * 2 + 1] = ((i / grid) | 0) + 0.5;
+    }
+    this.reversed = false;
+    this.assignment = null;
+  }
+
+  applyAssignment(assign) {
+    const grid = this.grid;
+    this.assignment = assign.slice();
+    for (let dst = 0; dst < assign.length; dst++) {
+      const src = assign[dst];
+      const sx = src % grid, sy = (src / grid) | 0;
+      const dx = dst % grid, dy = (dst / grid) | 0;
+      this.srcx[src] = sx + 0.5; this.srcy[src] = sy + 0.5;
+      this.dstx[src] = dx + 0.5; this.dsty[src] = dy + 0.5;
+      this.velx[src] = 0; this.vely[src] = 0;
+      this.accx[src] = 0; this.accy[src] = 0;
+    }
+  }
+
+  resetToSrc() {
+    for (let i = 0; i < this.n; i++) {
+      this.pos[i * 2] = this.srcx[i];
+      this.pos[i * 2 + 1] = this.srcy[i];
+      this.velx[i] = 0; this.vely[i] = 0; this.accx[i] = 0; this.accy[i] = 0; this.age[i] = 0;
+    }
+  }
+
+  resetToDst() {
+    for (let i = 0; i < this.n; i++) {
+      this.pos[i * 2] = this.dstx[i];
+      this.pos[i * 2 + 1] = this.dsty[i];
+      this.velx[i] = 0; this.vely[i] = 0; this.accx[i] = 0; this.accy[i] = 0;
+    }
+  }
+
+  switch() {
+    const { srcx, srcy, dstx, dsty, age } = this;
+    for (let i = 0; i < this.n; i++) {
+      let t = srcx[i]; srcx[i] = dstx[i]; dstx[i] = t;
+      t = srcy[i]; srcy[i] = dsty[i]; dsty[i] = t;
+      age[i] = 0;
+    }
+    this.reversed = !this.reversed;
+  }
+
+  preparePlay(reverse) {
+    if (this.reversed === reverse) this.resetToSrc();
+    else { this.resetToDst(); this.switch(); }
+  }
+
+  step() {
+    const g = this.grid, n = this.n, sidelen = g, pixel_size = 1;
+    const pos = this.pos, head = this.head, next = this.next;
+    head.fill(-1);
+    for (let i = 0; i < n; i++) {
+      let x = pos[i * 2] | 0, y = pos[i * 2 + 1] | 0;
+      if (x < 0) x = 0; else if (x >= g) x = g - 1;
+      if (y < 0) y = 0; else if (y >= g) y = g - 1;
+      const b = y * g + x;
+      next[i] = head[b]; head[b] = i;
+    }
+    const { srcx, srcy, dstx, dsty, velx, vely, accx, accy, age, dstforce } = this;
+    const wall = pixel_size * PERSONAL_SPACE * 0.5;
+    for (let i = 0; i < n; i++) {
+      const px = pos[i * 2], py = pos[i * 2 + 1];
+      if (px < wall) accx[i] += (wall - px) / wall;
+      else if (px > sidelen - wall) accx[i] -= (px - (sidelen - wall)) / wall;
+      if (py < wall) accy[i] += (wall - py) / wall;
+      else if (py > sidelen - wall) accy[i] -= (py - (sidelen - wall)) / wall;
+
+      const elapsed = age[i] / 60;
+      let f = dstforce[i] === 0 ? 0.1 : elapsed * dstforce[i];
+      f = f * f * f; if (f > 1000) f = 1000;
+      const ddx = dstx[i] - px, ddy = dsty[i] - py;
+      const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      accx[i] += ddx * dist * f / sidelen;
+      accy[i] += ddy * dist * f / sidelen;
+    }
+
+    const pspace = pixel_size * PERSONAL_SPACE;
+    for (let i = 0; i < n; i++) {
+      const px = pos[i * 2], py = pos[i * 2 + 1];
+      let x = px | 0, y = py | 0;
+      if (x < 0) x = 0; else if (x >= g) x = g - 1;
+      if (y < 0) y = 0; else if (y >= g) y = g - 1;
+      let ax = 0, ay = 0, count = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = y + dy; if (ny < 0 || ny >= g) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx; if (nx < 0 || nx >= g) continue;
+          let o = head[ny * g + nx];
+          while (o !== -1) {
+            if (o !== i) {
+              const ox = pos[o * 2], oy = pos[o * 2 + 1];
+              const ddx = ox - px, ddy = oy - py;
+              const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+              const w = (1 / dist) * (pspace - dist) / pspace;
+              if (dist > 0 && dist < pspace) { accx[i] -= ddx * w; accy[i] -= ddy * w; }
+              else if (dist === 0) { accx[i] += (Math.random() - 0.5) * 0.1; accy[i] += (Math.random() - 0.5) * 0.1; }
+              const ww = w > 0 ? w : 0;
+              accx[i] += ddx * ww * 0.8; accy[i] += ddy * ww * 0.8;
+              ax += velx[o] * ww; ay += vely[o] * ww; count += ww;
+            }
+            o = next[o];
+          }
+        }
+      }
+      if (count > 0) {
+        ax /= count; ay /= count;
+        accx[i] += (ax - velx[i]) * ALIGNMENT;
+        accy[i] += (ay - vely[i]) * ALIGNMENT;
+      }
+    }
+
+    for (let i = 0; i < n; i++) {
+      let vx = velx[i] + accx[i], vy = vely[i] + accy[i];
+      accx[i] = 0; accy[i] = 0;
+      vx *= 0.97; vy *= 0.97;
+      if (vx > MAX_VELOCITY) vx = MAX_VELOCITY; else if (vx < -MAX_VELOCITY) vx = -MAX_VELOCITY;
+      if (vy > MAX_VELOCITY) vy = MAX_VELOCITY; else if (vy < -MAX_VELOCITY) vy = -MAX_VELOCITY;
+      velx[i] = vx; vely[i] = vy;
+      pos[i * 2] += vx; pos[i * 2 + 1] += vy;
+      age[i] += 1;
+    }
+  }
+}
+
+/* ---- stage renderer --------------------------------------------------- */
+const DISPLAY = 512;
+const canvas = $("stage"), ctx = canvas.getContext("2d");
+const imgData = ctx.createImageData(DISPLAY, DISPLAY);
+const blackFrame = imgData.data.slice();
+for (let i = 3; i < blackFrame.length; i += 4) blackFrame[i] = 255;
+
+function render(sim) {
+  const R = DISPLAY, g = sim.grid, scale = R / g, half = Math.max(0.5, scale / 2);
+  const d = imgData.data, pos = sim.pos, col = sim.col;
+  d.set(blackFrame);
+  for (let i = 0; i < sim.n; i++) {
+    const cx = pos[i * 2] * scale, cy = pos[i * 2 + 1] * scale;
+    let x0 = Math.round(cx - half), x1 = Math.round(cx + half);
+    let y0 = Math.round(cy - half), y1 = Math.round(cy + half);
+    if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > R) x1 = R; if (y1 > R) y1 = R;
+    const r = col[i * 3], gg = col[i * 3 + 1], b = col[i * 3 + 2];
+    for (let y = y0; y < y1; y++) {
+      let o = (y * R + x0) * 4;
+      for (let x = x0; x < x1; x++, o += 4) { d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255; }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function renderGrid(rgb, grid) {
+  const R = DISPLAY, scale = R / grid;
+  const d = imgData.data;
+  d.set(blackFrame);
+  for (let cy = 0; cy < grid; cy++) {
+    for (let cx = 0; cx < grid; cx++) {
+      const i = cy * grid + cx;
+      const x0 = Math.round(cx * scale), x1 = Math.round((cx + 1) * scale);
+      const y0 = Math.round(cy * scale), y1 = Math.round((cy + 1) * scale);
+      const r = rgb[i * 3], gg = rgb[i * 3 + 1], b = rgb[i * 3 + 2];
+      for (let y = y0; y < y1; y++) {
+        let o = (y * R + x0) * 4;
+        for (let x = x0; x < x1; x++, o += 4) { d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255; }
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function looksLikeText(bytes) {
+  const n = Math.min(bytes.length, 4096);
+  if (!n) return false;
+  let printable = 0;
+  for (let i = 0; i < n; i++) {
+    const b = bytes[i];
+    if (b === 0) return false;
+    if (b === 9 || b === 10 || b === 13 || (b >= 32 && b < 127) || b >= 128) printable++;
+  }
+  return printable / n > 0.9;
+}
+
+function renderText(text) {
+  const top = ($("bar").offsetHeight || 0) + 8;
+  ctx.imageSmoothingEnabled = true;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, DISPLAY, DISPLAY);
+  ctx.fillStyle = "#eee";
+  ctx.font = "13px ui-monospace, Consolas, monospace";
+  ctx.textBaseline = "top";
+  const lines = text.replace(/\t/g, "    ").split("\n");
+  const lh = 15;
+  for (let i = 0; i < lines.length && top + i * lh + lh < DISPLAY; i++) ctx.fillText(lines[i].slice(0, 160), 6, top + i * lh);
+}
+
+/* ---- gif encoder ------------------------------------------------------ */
+const GIF_FRAMERATE = 8, GIF_RESOLUTION = 400, GIF_MAX_FRAMES = 140,
+  GIF_MIN_FRAMES = 100, GIF_MAX_SIZE = 10 * 1024 * 1024, GIF_SPEED = 1.5;
+const R_VIDEO = 320;
+
+function medianCut(samples, max) {
+  let boxes = [samples];
+  while (boxes.length < max) {
+    let bi = -1, best = -1;
+    for (let i = 0; i < boxes.length; i++) {
+      const bx = boxes[i];
+      if (bx.length < 2) continue;
+      let rmin = 255, rmax = 0, gmin = 255, gmax = 0, bmin = 255, bmax = 0;
+      for (const c of bx) {
+        if (c[0] < rmin) rmin = c[0]; if (c[0] > rmax) rmax = c[0];
+        if (c[1] < gmin) gmin = c[1]; if (c[1] > gmax) gmax = c[1];
+        if (c[2] < bmin) bmin = c[2]; if (c[2] > bmax) bmax = c[2];
+      }
+      const range = Math.max(rmax - rmin, gmax - gmin, bmax - bmin);
+      if (range > best) { best = range; bi = i; }
+    }
+    if (bi < 0) break;
+    const box = boxes[bi];
+    let r0 = 255, r1 = 0, g0 = 255, g1 = 0, b0 = 255, b1 = 0;
+    for (const c of box) {
+      if (c[0] < r0) r0 = c[0]; if (c[0] > r1) r1 = c[0];
+      if (c[1] < g0) g0 = c[1]; if (c[1] > g1) g1 = c[1];
+      if (c[2] < b0) b0 = c[2]; if (c[2] > b1) b1 = c[2];
+    }
+    const dr = r1 - r0, dg = g1 - g0, db = b1 - b0;
+    const ch = dr >= dg && dr >= db ? 0 : dg >= db ? 1 : 2;
+    box.sort((a, b) => a[ch] - b[ch]);
+    const mid = box.length >> 1;
+    boxes.splice(bi, 1, box.slice(0, mid), box.slice(mid));
+  }
+  return boxes.map((box) => {
+    let r = 0, g = 0, b = 0;
+    for (const c of box) { r += c[0]; g += c[1]; b += c[2]; }
+    const k = box.length || 1;
+    return [Math.round(r / k), Math.round(g / k), Math.round(b / k)];
+  });
+}
+
+function paletteFrom(samples) {
+  const seen = new Set(), uniq = [];
+  for (const c of samples) {
+    const key = (c[0] << 16) | (c[1] << 8) | c[2];
+    if (!seen.has(key)) { seen.add(key); uniq.push(c); }
+  }
+  const pal = [[0, 0, 0]].concat(medianCut(uniq, 255));
+  const cache = new Map();
+  const indexOf = (r, g, b) => {
+    const key = (r << 16) | (g << 8) | b;
+    let v = cache.get(key);
+    if (v !== undefined) return v;
+    let best = 0, bd = Infinity;
+    for (let p = 1; p < pal.length; p++) {
+      const dr = r - pal[p][0], dg = g - pal[p][1], db = b - pal[p][2];
+      const d = dr * dr + dg * dg + db * db;
+      if (d < bd) { bd = d; best = p; }
+    }
+    cache.set(key, best);
+    return best;
+  };
+  return { pal, indexOf };
+}
+
+function buildPalette(cols, nCells) {
+  const samples = [];
+  for (let i = 0; i < nCells; i++) samples.push([cols[i * 3], cols[i * 3 + 1], cols[i * 3 + 2]]);
+  return paletteFrom(samples);
+}
+
+function lzw(minCodeSize, indices) {
+  const clear = 1 << minCodeSize, eoi = clear + 1;
+  const bytes = [];
+  let bitBuf = 0, bitCnt = 0, codeSize = minCodeSize + 1, nextCode = eoi + 1;
+  let dict = new Map();
+  const emit = (code) => {
+    bitBuf |= code << bitCnt; bitCnt += codeSize;
+    while (bitCnt >= 8) { bytes.push(bitBuf & 255); bitBuf >>= 8; bitCnt -= 8; }
+  };
+  emit(clear);
+  let cur = indices[0];
+  for (let i = 1; i < indices.length; i++) {
+    const k = indices[i];
+    const key = (cur << 8) | k;
+    const got = dict.get(key);
+    if (got !== undefined) { cur = got; continue; }
+    emit(cur);
+    dict.set(key, nextCode++);
+    if (nextCode > (1 << codeSize)) {
+      if (codeSize < 12) codeSize++;
+      else { emit(clear); dict = new Map(); codeSize = minCodeSize + 1; nextCode = eoi + 1; }
+    }
+    cur = k;
+  }
+  emit(cur);
+  emit(eoi);
+  if (bitCnt > 0) bytes.push(bitBuf & 255);
+  const out = [];
+  for (let i = 0; i < bytes.length; i += 255) {
+    const chunk = bytes.slice(i, i + 255);
+    out.push(chunk.length, ...chunk);
+  }
+  out.push(0);
+  return out;
+}
+
+function assembleGif(frames, pal, w, h, delay) {
+  const head = [];
+  const push = (a) => { for (const b of a) head.push(b); };
+  const str = (s) => push([...s].map((c) => c.charCodeAt(0)));
+  str("GIF89a");
+  push([w & 255, w >> 8, h & 255, h >> 8, 0xf7, 0, 0]);
+  for (let i = 0; i < 256; i++) push(i < pal.length ? pal[i] : [0, 0, 0]);
+  push([0x21, 0xff, 0x0b]);
+  str("NETSCAPE2.0");
+  push([0x03, 0x01, 0x00, 0x00, 0x00]);
+  const parts = [new Uint8Array(head)];
+  const minCodeSize = Math.max(2, Math.ceil(Math.log2(pal.length || 2)));
+  for (const idx of frames) {
+    parts.push(new Uint8Array([0x21, 0xf9, 0x04, 0x04, delay & 255, delay >> 8, 0x00, 0x00]));
+    parts.push(new Uint8Array([0x2c, 0, 0, 0, 0, w & 255, w >> 8, h & 255, h >> 8, 0x00]));
+    parts.push(new Uint8Array([minCodeSize]));
+    parts.push(new Uint8Array(idx));
+  }
+  parts.push(new Uint8Array([0x3b]));
+  let total = 0;
+  for (const p of parts) total += p.length;
+  const gif = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) { gif.set(p, off); off += p.length; }
+  return gif;
+}
+
+function renderIndex(sim, R, buf, indexOf) {
+  const g = sim.grid, scale = R / g, half = Math.max(0.5, scale / 2);
+  const pos = sim.pos, col = sim.col;
+  buf.fill(0);
+  for (let i = 0; i < sim.n; i++) {
+    const cx = pos[i * 2] * scale, cy = pos[i * 2 + 1] * scale;
+    let x0 = Math.round(cx - half), x1 = Math.round(cx + half);
+    let y0 = Math.round(cy - half), y1 = Math.round(cy + half);
+    if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > R) x1 = R; if (y1 > R) y1 = R;
+    const idx = indexOf(col[i * 3], col[i * 3 + 1], col[i * 3 + 2]);
+    for (let y = y0; y < y1; y++) {
+      const base = y * R;
+      for (let x = x0; x < x1; x++) buf[base + x] = idx;
+    }
+  }
+}
+
+function renderFrameIndex(rgb, side, R, buf, indexOf) {
+  const scale = R / side;
+  buf.fill(0);
+  for (let cy = 0; cy < side; cy++) {
+    const y0 = Math.round(cy * scale), y1 = Math.round((cy + 1) * scale);
+    for (let cx = 0; cx < side; cx++) {
+      const i = cy * side + cx;
+      const idx = indexOf(rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]);
+      const x0 = Math.round(cx * scale), x1 = Math.round((cx + 1) * scale);
+      for (let y = y0; y < y1; y++) {
+        const base = y * R;
+        for (let x = x0; x < x1; x++) buf[base + x] = idx;
+      }
+    }
+  }
+}
+
+/* ---- worker ----------------------------------------------------------- */
+const WORKER_URL = URL.createObjectURL(new Blob([$("worker-src").textContent], { type: "text/javascript" }));
+let worker = null, workerReady = null;
+let pendingGrid = null, solveActive = null, pendingAdapt = null;
+
+function onWorkerMessage(e) {
+  const m = e.data;
+  if (m.t === "grid") {
+    if (pendingGrid) { const r = pendingGrid; pendingGrid = null; r(new Uint8Array(m.rgb)); }
+  } else if (m.t === "frame") {
+    if (solveActive) solveActive.frame(new Uint8Array(m.rgb), new Uint32Array(m.assign), m.gen);
+  } else if (m.t === "assign") {
+    if (pendingAdapt) { const r = pendingAdapt; pendingAdapt = null; r(new Uint32Array(m.assign)); }
+  } else if (m.t === "done") {
+    if (solveActive) { const s = solveActive; solveActive = null; s.done(); }
+  } else if (m.t === "error") {
+    if (pendingGrid) { const r = pendingGrid; pendingGrid = null; r(null); }
+    if (pendingAdapt) { const r = pendingAdapt; pendingAdapt = null; r(null); }
+    if (solveActive) { const s = solveActive; solveActive = null; s.error(m.msg); }
+  }
+}
+
+function ensureWorker() {
+  if (workerReady) return workerReady;
+  worker = new Worker(WORKER_URL);
+  worker.onmessage = onWorkerMessage;
+  const w = worker;
+  workerReady = new Promise((res) => {
+    const onReady = (e) => { if (e.data.t === "ready") { w.removeEventListener("message", onReady); res(); } };
+    w.addEventListener("message", onReady);
+    w.postMessage({ t: "init", wasm: self.__LABRONIFY_WASM });
+  });
+  return workerReady;
+}
+
+function cancelSolve() {
+  cancelled = true;
+  if (solveActive) { const s = solveActive; solveActive = null; s.done(); }
+  worker.terminate(); worker = null; workerReady = null;
+  $("progress").hidden = true;
+  ensureWorker();
+}
+
+function reduce(bytes, ext, side, crop) {
+  return new Promise((resolve) => {
+    pendingGrid = resolve;
+    worker.postMessage({ t: "reduce", bytes, ext, side, crop });
+  });
+}
+function solve(grid, target, side, prox, optimal) {
+  return new Promise((resolve, reject) => {
+    solveActive = {
+      frame: (rgb, assign, gen) => onSolveFrame(assign, gen),
+      done: () => resolve(),
+      error: (msg) => reject(new Error(msg)),
+    };
+    worker.postMessage({ t: "solve", grid: grid.buffer, target: target ? target.buffer : null, side, prox, optimal });
+  });
+}
+function adapt(grid, side, prox, prev, maxGens) {
+  return new Promise((resolve) => {
+    pendingAdapt = resolve;
+    worker.postMessage({ t: "adapt", grid: grid.buffer, side, prox, prev: prev ? prev.buffer : null, maxGens });
+  });
+}
+
+/* ---- app state -------------------------------------------------------- */
+const sim = new Sim();
+let animate = false, recording = false, cancelled = false, mode = "transform";
+let videoBlob = null, vOutUrl = null;
+let presets = [], currentPreset = -1;
+const STORE = "labronify.presets.v1";
+const PRESET_IMAGES = ["wisetree", "blackhole", "cat", "cat2", "colorful"];
+const PRESET_DIR = "presets/";
+const srcCrop = { x: 0, y: 0, scale: 1 };
+let srcFile = null, srcImg = null;
+
+function loadPresets() {
+  try { presets = JSON.parse(localStorage.getItem(STORE) || "[]"); } catch (e) { presets = []; }
+  refreshPresetSelect();
+}
+function savePresets() { try { localStorage.setItem(STORE, JSON.stringify(presets)); } catch (e) { /* full */ } }
+
+function refreshPresetSelect() {
+  const sel = $("presets");
+  sel.innerHTML = "";
+  PRESET_IMAGES.forEach((name, i) => {
+    const o = document.createElement("option");
+    o.value = "p:" + i;
+    o.textContent = name;
+    sel.appendChild(o);
+  });
+  presets.forEach((p, i) => {
+    const o = document.createElement("option");
+    o.value = "s:" + i;
+    o.textContent = p.name.length > 13 ? p.name.slice(0, 10) + "…" : p.name;
+    sel.appendChild(o);
+  });
+  sel.value = presets.length ? "s:" + (currentPreset >= 0 ? currentPreset : 0) : "p:0";
+  $("delpreset").hidden = presets.length <= 5;
+}
+
+async function selectPreset(value) {
+  if (value.startsWith("p:")) {
+    const name = PRESET_IMAGES[Number(value.slice(2))];
+    const img = await loadImage(PRESET_DIR + name + ".png");
+    if (!img) { warn("could not load preset " + name); return; }
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img, 0, 0);
+    const blob = await new Promise((r) => c.toBlob(r, "image/png"));
+    srcFile = new File([blob], name + ".png", { type: "image/png" });
+    srcImg = img;
+    srcCrop.x = 0; srcCrop.y = 0; srcCrop.scale = 1; $("s-cs").value = "1";
+    $("s-name").value = name;
+    drawSrcCrop();
+    previewSource();
+    await start();
+    return;
+  }
+  const i = Number(value.slice(2));
+  const p = presets[i];
+  if (!p) return;
+  currentPreset = i;
+  sim.name = p.name;
+  sim.load(unb64(p.src), p.grid);
+  sim.applyAssignment(new Uint32Array(unb64(p.assign).buffer));
+  sim.preparePlay(false);
+  $("reverse").checked = false;
+  $("savegif").textContent = "save gif";
+  animate = true;
+  refreshPresetSelect();
+}
+
+/* ---- animation loop --------------------------------------------------- */
+function tick() {
+  requestAnimationFrame(tick);
+  if (mode === "transform" && animate && sim.n) { sim.step(); render(sim); }
+}
+
+/* ---- solve flow ------------------------------------------------------- */
+function onSolveFrame(assign, gen) {
+  if (!sim.n) return;
+  sim.applyAssignment(assign);
+  $("p-bar").value = Math.min(0.99, gen / (sim.grid + 8));
+}
+
+function openSettings() { $("settings").hidden = false; }
+function closeSettings() { $("settings").hidden = true; }
+
+async function start() {
+  const name = ($("s-name").value || "image").trim();
+  const res = Number($("s-res").value);
+  const prox = Number($("s-prox").value);
+  const optimal = $("s-algo").value === "optimal";
+  if (!srcFile) { warn("choose a source file"); return; }
+  closeSettings();
+  await ensureWorker();
+
+  $("progress").hidden = false; $("p-bar").value = 0; $("p-label").textContent = "reading...";
+
+  const ext = extOf(srcFile.name);
+  const grid = await reduce(new Uint8Array(await srcFile.arrayBuffer()), ext, res, srcCrop);
+  if (!grid) { $("progress").hidden = true; showError("could not read that file as ." + ext); return; }
+
+  sim.name = name;
+  sim.load(grid, res);
+  sim.resetToSrc();
+  animate = true;
+  $("p-label").textContent = "processing...";
+  $("p-bar").value = 0;
+  cancelled = false;
+
+  try {
+    await solve(grid, null, res, prox, optimal);
+  } catch (err) {
+    $("progress").hidden = true;
+    showError(String(err.message || err));
+    return;
+  }
+  if (cancelled) { cancelled = false; return; }
+  $("progress").hidden = true;
+
+  const assign = new Uint8Array(new Uint32Array(sim.assignment).buffer);
+  presets.push({ name, grid: res, src: b64(grid), assign: b64(assign), proximity: prox });
+  currentPreset = presets.length - 1;
+  $("newimg").classList.remove("glow");
+  savePresets();
+  refreshPresetSelect();
+  sim.resetToSrc();
+  animate = true;
+  $("reverse").checked = false;
+  $("savegif").textContent = "save gif";
+}
+
+function showError(msg) { $("errorwin").hidden = false; $("e-msg").textContent = msg; }
+
+/* ---- gif recording ---------------------------------------------------- */
+let gifCancel = false;
+async function recordGif() {
+  if (!sim.n) return;
+  recording = true;
+  $("gifwin").hidden = false;
+  $("g-label").textContent = "recording gif...";
+  const reverse = $("reverse").checked;
+  const R = GIF_RESOLUTION;
+  const buf = new Uint8Array(R * R);
+
+  sim.resetToSrc();
+  sim.preparePlay(reverse);
+  for (let i = 0; i < 20; i++) sim.step();
+
+  const { pal, indexOf } = buildPalette(sim.col, sim.n);
+  const frames = [];
+  const delay = Math.round((100 / GIF_FRAMERATE) / GIF_SPEED);
+  let size = 0;
+  gifCancel = false;
+
+  while (true) {
+    renderIndex(sim, R, buf, indexOf);
+    const block = lzw(Math.max(2, Math.ceil(Math.log2(pal.length || 2))), buf);
+    frames.push(new Uint8Array(block));
+    size += block.length + 24;
+    if (frames.length >= GIF_MIN_FRAMES && (frames.length >= GIF_MAX_FRAMES || size > GIF_MAX_SIZE)) break;
+    if (gifCancel) break;
+    for (let i = 0; i < Math.round(60 / GIF_FRAMERATE); i++) sim.step();
+    if (!(frames.length % 8)) { $("g-label").textContent = "recording gif... " + frames.length + " frames"; await new Promise((r) => setTimeout(r, 0)); }
+  }
+
+  recording = false;
+  $("gifwin").hidden = true;
+  if (gifCancel) return;
+  download(new Blob([assembleGif(frames, pal, R, R, delay)], { type: "image/gif" }),
+      (reverse ? "unlebronify_" : "lebronify_") + sim.name + ".gif");
+}
+
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---- crop widgets ----------------------------------------------------- */
+function cropRegion(w, h, crop) {
+  const s = Math.max(crop.scale, 1);
+  const base = Math.min(w, h);
+  const side = Math.max(1, Math.min(Math.floor(base / s), w, h));
+  const maxX = Math.max(0, w - side), maxY = Math.max(0, h - side);
+  const xn = (Math.max(-1, Math.min(1, crop.x)) + 1) * 0.5;
+  const yn = (Math.max(-1, Math.min(1, crop.y)) + 1) * 0.5;
+  return { x0: Math.round(xn * maxX), y0: Math.round(yn * maxY), side, maxX, maxY };
+}
+const imgW = (img) => img.naturalWidth || img.width;
+const imgH = (img) => img.naturalHeight || img.height;
+
+function makeCrop(canvasId, inputId, crop, getImg, onChange) {
+  const c = $(canvasId), g = c.getContext("2d");
+  const draw = () => {
+    const S = c.width;
+    g.fillStyle = "#000"; g.fillRect(0, 0, S, S);
+    const img = getImg();
+    if (!img) return;
+    const { x0, y0, side } = cropRegion(imgW(img), imgH(img), crop);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(img, x0, y0, side, side, 0, 0, S, S);
+  };
+  let down = false, lx = 0, ly = 0;
+  c.addEventListener("pointerdown", (e) => { down = true; lx = e.clientX; ly = e.clientY; c.setPointerCapture(e.pointerId); });
+  c.addEventListener("pointermove", (e) => {
+    if (!down) return;
+    const img = getImg(); if (!img) return;
+    const S = c.width;
+    const { x0, y0, side, maxX, maxY } = cropRegion(imgW(img), imgH(img), crop);
+    const k = side / S;
+    const nx0 = x0 - (e.clientX - lx) * k, ny0 = y0 - (e.clientY - ly) * k;
+    crop.x = maxX > 0 ? (Math.max(0, Math.min(maxX, nx0)) / maxX) * 2 - 1 : 0;
+    crop.y = maxY > 0 ? (Math.max(0, Math.min(maxY, ny0)) / maxY) * 2 - 1 : 0;
+    lx = e.clientX; ly = e.clientY;
+    draw();
+    if (onChange) onChange();
+  });
+  const end = () => { down = false; };
+  c.addEventListener("pointerup", end);
+  c.addEventListener("pointercancel", end);
+  $(inputId).addEventListener("input", () => { crop.scale = Number($(inputId).value); draw(); if (onChange) onChange(); });
+  return draw;
+}
+
+function extOf(name) { return (name.split(".").pop() || "").toLowerCase(); }
+function loadImage(file) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => res(null);
+    img.src = typeof file === "string" ? file : URL.createObjectURL(file);
+  });
+}
+
+const drawSrcCrop = makeCrop("src-crop", "s-cs", srcCrop, () => srcImg, previewSource);
+
+let previewSeq = 0;
+async function previewSource() {
+  if (!srcFile) return;
+  animate = false;
+  if (srcImg) {
+    const iw = imgW(srcImg), ih = imgH(srcImg);
+    const s = DISPLAY / Math.max(iw, ih), w = iw * s, h = ih * s;
+    ctx.imageSmoothingEnabled = true;
+    ctx.clearRect(0, 0, DISPLAY, DISPLAY);
+    ctx.drawImage(srcImg, (DISPLAY - w) / 2, (DISPLAY - h) / 2, w, h);
+    return;
+  }
+  const seq = ++previewSeq;
+  const bytes = new Uint8Array(await srcFile.arrayBuffer());
+  if (looksLikeText(bytes)) {
+    if (seq === previewSeq) renderText(new TextDecoder().decode(bytes));
+    return;
+  }
+  const side = Number($("s-res").value);
+  const grid = await reduce(bytes, extOf(srcFile.name), side, srcCrop);
+  if (grid && seq === previewSeq) renderGrid(grid, side);
+}
+
+/* ---- drawing mode ----------------------------------------------------- */
+const DRAW_SIDE = 256;
+const drawCanvas = document.createElement("canvas");
+drawCanvas.width = drawCanvas.height = DRAW_SIDE;
+const dctx = drawCanvas.getContext("2d", { willReadFrequently: true });
+const DRAW_COLORS = ["#000000", "#86d9e3", "#383232", "#D49976", "#793025"];
+let drawColor = "#86d9e3", drawing = false, lastX = 0, lastY = 0;
+let liveDirty = false, liveBusy = false, livePrev = null, liveGrid = null, liveAssign = null, liveSide = 0;
+
+function clearDrawing() {
+  dctx.fillStyle = "#000000";
+  dctx.fillRect(0, 0, DRAW_SIDE, DRAW_SIDE);
+  livePrev = null;
+  renderDrawing();
+  liveSolve();
+}
+function renderDrawing() {
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, DISPLAY, DISPLAY);
+  ctx.drawImage(drawCanvas, 0, 0, DISPLAY, DISPLAY);
+}
+function drawingGrid(side) {
+  const src = dctx.getImageData(0, 0, DRAW_SIDE, DRAW_SIDE).data;
+  const grid = new Uint8Array(side * side * 3);
+  const step = DRAW_SIDE / side;
+  for (let cy = 0; cy < side; cy++) {
+    const sy = Math.min(DRAW_SIDE - 1, (cy * step + step / 2) | 0) * DRAW_SIDE;
+    for (let cx = 0; cx < side; cx++) {
+      const sx = Math.min(DRAW_SIDE - 1, (cx * step + step / 2) | 0);
+      const si = (sy + sx) * 4, di = (cy * side + cx) * 3;
+      grid[di] = src[si]; grid[di + 1] = src[si + 1]; grid[di + 2] = src[si + 2];
+    }
+  }
+  return grid;
+}
+function renderAssign(grid, assign, side) {
+  const R = DISPLAY, scale = R / side, d = imgData.data;
+  d.set(blackFrame);
+  for (let cy = 0; cy < side; cy++) {
+    const y0 = Math.round(cy * scale), y1 = Math.round((cy + 1) * scale);
+    for (let cx = 0; cx < side; cx++) {
+      const dst = cy * side + cx, s = assign[dst];
+      const x0 = Math.round(cx * scale), x1 = Math.round((cx + 1) * scale);
+      const r = grid[s * 3], g = grid[s * 3 + 1], b = grid[s * 3 + 2];
+      for (let y = y0; y < y1; y++) {
+        let o = (y * R + x0) * 4;
+        for (let x = x0; x < x1; x++, o += 4) { d[o] = r; d[o + 1] = g; d[o + 2] = b; d[o + 3] = 255; }
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+function liveSolve() {
+  if (mode !== "draw") return;
+  liveDirty = true;
+  if (!liveBusy) runLive();
+}
+async function runLive() {
+  liveBusy = true;
+  const side = Math.min(Number($("s-res").value), 128), prox = Number($("s-prox").value);
+  while (liveDirty && mode === "draw") {
+    liveDirty = false;
+    const grid = drawingGrid(side);
+    const assign = await adapt(grid, side, prox, livePrev, 6);
+    if (mode !== "draw") break;
+    if (assign) {
+      livePrev = new Uint8Array(assign.buffer);
+      liveGrid = grid;
+      liveAssign = assign;
+      liveSide = side;
+      renderAssign(grid, assign, side);
+    }
+  }
+  liveBusy = false;
+}
+function stageToDraw(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width * DRAW_SIDE, y: (e.clientY - r.top) / r.height * DRAW_SIDE };
+}
+function strokeTo(x, y) {
+  dctx.strokeStyle = drawColor;
+  dctx.lineWidth = Number($("d-size").value);
+  dctx.lineCap = "round"; dctx.lineJoin = "round";
+  dctx.beginPath(); dctx.moveTo(lastX, lastY); dctx.lineTo(x, y); dctx.stroke();
+  lastX = x; lastY = y;
+  renderDrawing();
+  liveSolve();
+}
+canvas.addEventListener("pointerdown", (e) => {
+  if (mode !== "draw") return;
+  drawing = true; const p = stageToDraw(e); lastX = p.x; lastY = p.y; strokeTo(p.x, p.y);
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", (e) => { if (mode === "draw" && drawing) { const p = stageToDraw(e); strokeTo(p.x, p.y); } });
+canvas.addEventListener("pointerup", () => { drawing = false; });
+canvas.addEventListener("pointercancel", () => { drawing = false; });
+
+function buildDrawPalette() {
+  const holder = $("d-pal");
+  holder.innerHTML = "";
+  for (const c of DRAW_COLORS) {
+    const b = document.createElement("button");
+    b.style.background = c;
+    b.className = c === drawColor ? "on" : "";
+    b.onclick = () => { drawColor = c; buildDrawPalette(); };
+    holder.appendChild(b);
+  }
+}
+
+function labronifyDrawing() {
+  if (!liveGrid || !liveAssign) return;
+  const prox = Number($("s-prox").value);
+  sim.name = "drawing";
+  sim.load(liveGrid, liveSide);
+  sim.applyAssignment(liveAssign);
+  sim.preparePlay(false);
+  presets.push({ name: "drawing", grid: liveSide, src: b64(liveGrid), assign: b64(new Uint8Array(liveAssign.buffer)), proximity: prox });
+  currentPreset = presets.length - 1;
+  savePresets();
+  refreshPresetSelect();
+  setMode("transform");
+  $("reverse").checked = false;
+  $("savegif").textContent = "save gif";
+  animate = true;
+  $("newimg").classList.remove("glow");
+}
+
+/* ---- video mode ------------------------------------------------------- */
+function seekTo(v, t) {
+  return new Promise((res) => {
+    let done = false;
+    const fin = () => { if (done) return; done = true; v.removeEventListener("seeked", fin); res(); };
+    v.addEventListener("seeked", fin);
+    v.currentTime = t;
+    setTimeout(fin, 250);
+  });
+}
+
+async function labronifyVideo() {
+  const f = $("v-src").files[0];
+  if (!f) { warn("choose a video file"); return; }
+  await ensureWorker();
+  $("v-out").hidden = true; $("v-save").hidden = true;
+  const v = document.createElement("video");
+  v.src = URL.createObjectURL(f); v.muted = true; v.playsInline = true;
+  await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = rej; });
+
+  const side = Math.min(Number($("s-res").value), 128);
+  const prox = Number($("s-prox").value);
+  const fps = 12;
+  const nf = Math.max(1, Math.min(GIF_MAX_FRAMES, Math.floor((v.duration || 1) * fps)));
+  const tmp = document.createElement("canvas"); tmp.width = tmp.height = side;
+  const tctx = tmp.getContext("2d", { willReadFrequently: true });
+
+  $("progress").hidden = false; $("p-bar").value = 0; $("p-label").textContent = "lebronifying video...";
+  const frames = [], samples = [];
+  let prev = null;
+  for (let i = 0; i < nf; i++) {
+    await seekTo(v, i / fps);
+    const vw = v.videoWidth, vh = v.videoHeight, cs = Math.min(vw, vh);
+    tctx.drawImage(v, (vw - cs) / 2, (vh - cs) / 2, cs, cs, 0, 0, side, side);
+    const px = tctx.getImageData(0, 0, side, side).data;
+    const grid = new Uint8Array(side * side * 3);
+    for (let p = 0; p < side * side; p++) { grid[p * 3] = px[p * 4]; grid[p * 3 + 1] = px[p * 4 + 1]; grid[p * 3 + 2] = px[p * 4 + 2]; }
+    const assign = await adapt(grid, side, prox, prev, i === 0 ? 0 : 6);
+    if (assign) prev = new Uint8Array(new Uint32Array(assign).buffer);
+    const out = new Uint8Array(side * side * 3);
+    for (let dst = 0; dst < side * side; dst++) {
+      const s = assign ? assign[dst] : dst;
+      out[dst * 3] = grid[s * 3]; out[dst * 3 + 1] = grid[s * 3 + 1]; out[dst * 3 + 2] = grid[s * 3 + 2];
+    }
+    frames.push(out);
+    if (samples.length < 40000) for (let p = 0; p < side * side; p += 11) samples.push([out[p * 3], out[p * 3 + 1], out[p * 3 + 2]]);
+    $("p-bar").value = (i + 1) / nf;
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  $("progress").hidden = true;
+
+  const R = R_VIDEO;
+  const { pal, indexOf } = paletteFrom(samples);
+  const buf = new Uint8Array(R * R);
+  const delay = Math.max(2, Math.round(100 / fps));
+  const gif = [];
+  for (const frame of frames) {
+    renderFrameIndex(frame, side, R, buf, indexOf);
+    gif.push(new Uint8Array(lzw(Math.max(2, Math.ceil(Math.log2(pal.length || 2))), buf)));
+  }
+  videoBlob = new Blob([assembleGif(gif, pal, R, R, delay)], { type: "image/gif" });
+  if (vOutUrl) URL.revokeObjectURL(vOutUrl);
+  vOutUrl = URL.createObjectURL(videoBlob);
+  $("v-out").src = vOutUrl;
+  $("v-out").hidden = false;
+  $("v-save").hidden = false;
+}
+
+/* ---- mode switching --------------------------------------------------- */
+function setMode(m) {
+  mode = m;
+  $("t-ui").hidden = m !== "transform";
+  $("d-ui").hidden = m !== "draw";
+  $("v-ui").hidden = m !== "video";
+  $("home").hidden = m === "transform";
+  if (m === "draw") { renderDrawing(); liveSolve(); }
+  if (m === "transform" && sim.n) render(sim);
+  if (m === "video") { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, DISPLAY, DISPLAY); }
+  $("v-out").hidden = !(m === "video" && videoBlob);
+}
+
+/* ---- wire the ui ------------------------------------------------------ */
+(function () {
+  const res = $("s-res"), prox = $("s-prox");
+  res.oninput = () => { $("s-res-o").value = res.value; previewSource(); };
+  prox.oninput = () => $("s-prox-o").value = prox.value;
+})();
+
+$("play").onclick = () => { if (mode === "transform") { animate = true; sim.preparePlay($("reverse").checked); } };
+$("reverse").onchange = () => {
+  $("savegif").textContent = $("reverse").checked ? "save reverse gif" : "save gif";
+  if (mode !== "transform" || !sim.n) return;
+  animate = true; sim.preparePlay($("reverse").checked);
+};
+$("savegif").onclick = () => { if (!recording) recordGif(); };
+$("g-cancel").onclick = () => { gifCancel = true; };
+$("newimg").onclick = openSettings;
+$("s-cancel").onclick = closeSettings;
+$("s-start").onclick = start;
+$("p-cancel").onclick = cancelSolve;
+$("e-close").onclick = () => { $("errorwin").hidden = true; };
+$("presets").onchange = () => selectPreset($("presets").value);
+$("delpreset").onclick = () => {
+  if (presets.length <= 5 || currentPreset < 0) return;
+  presets.splice(currentPreset, 1);
+  currentPreset = Math.min(currentPreset, presets.length - 1);
+  savePresets();
+  selectPreset("s:" + currentPreset);
+};
+
+$("s-src-btn").onclick = () => $("s-src").click();
+$("s-src").onchange = async () => {
+  const f = $("s-src").files[0];
+  if (!f) return;
+  srcFile = f;
+  srcImg = await loadImage(f);
+  srcCrop.x = 0; srcCrop.y = 0; srcCrop.scale = 1; $("s-cs").value = "1";
+  drawSrcCrop();
+  previewSource();
+};
+
+$("drawbtn").onclick = () => { clearDrawing(); setMode("draw"); };
+$("vidbtn").onclick = () => setMode("video");
+$("home").onclick = () => setMode("transform");
+$("d-clear").onclick = clearDrawing;
+$("d-obamify").onclick = labronifyDrawing;
+$("v-go").onclick = labronifyVideo;
+$("v-save").onclick = () => {
+  const f = $("v-src").files[0];
+  if (videoBlob) download(videoBlob, "lebronify_" + (f ? f.name.replace(/\.[^.]+$/, "") : "video") + ".gif");
+};
+
+async function boot() {
+  buildDrawPalette();
+  if (!self.__LABRONIFY_WASM) { $("loading").textContent = "engine not loaded. open this page through tools/serve.py."; return; }
+  await ensureWorker();
+  loadPresets();
+  if (presets.length) selectPreset("s:" + (currentPreset >= 0 ? currentPreset : 0));
+  $("loading").hidden = true;
+  setMode("transform");
+  requestAnimationFrame(tick);
+}
+boot();
+</script>
+</body>
+</html>

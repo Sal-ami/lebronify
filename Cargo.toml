@@ -1,0 +1,61 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/lab-core",
+  "crates/lab-media",
+  "crates/lab-export",
+  "crates/lab-cli",
+  "crates/lab-web",
+  "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+authors = ["labronify contributors"]
+
+[workspace.dependencies]
+lab-core = { path = "crates/lab-core" }
+lab-media = { path = "crates/lab-media" }
+lab-export = { path = "crates/lab-export" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "jpeg",
+  "gif",
+  "bmp",
+  "tiff",
+  "webp",
+] }
+anyhow = "1.0"
+symphonia = { version = "0.5", default-features = false, features = [
+  "wav",
+  "mp3",
+  "flac",
+  "ogg",
+  "vorbis",
+  "pcm",
+] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Keep dependencies optimized even in debug builds. The solver is the whole
+# program; an unoptimized dependency here costs minutes per run.
+[profile.dev.package."*"]
+opt-level = 2
+
+# The audio tier's STFT is a tight numeric loop and is the only hot code in
+# lab-media. At `dev`'s opt-level 0 a one-second clip takes tens of seconds in
+# tests, which is enough to make the tier unpleasant to work on. This overrides
+# the workspace default for that crate only; `lab-core` above it also benefitted
+# from the wildcard rule and keeps it.
+[profile.dev.package.lab-media]
+opt-level = 3
